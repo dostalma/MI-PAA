@@ -85,16 +85,6 @@ void deinit() {
 }
 
 /**
- * Recursive calculation of an instance
- * BruteForce algorithm
- * @param Row number of an instance
- * @param Current
- */
-int calculateRecursive(int pos, int curItemNum) {
-	return 0;
-}
-
-/**
  * Calculate problem of an instance
  * BruteForce algorithm
  * @param Row number of an instance
