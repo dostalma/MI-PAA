@@ -4,7 +4,8 @@
 #include <fstream>
 #include <string.h>
 #include <sstream>
-#include <math.h> 
+#include <cmath>
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -122,10 +123,19 @@ int main(int argc,  char **argv) {
 	if (!initialize(argv[1]))
 		return 1;
 
+	// start counting time
+    clock_t S, L;
+    S = clock();
+
 	for (int currentInstance = 0; currentInstance < ROWS_COUNT; ++currentInstance) {
+		L = clock();
 		g_Results[currentInstance] = calculate(currentInstance);
-		cout << "#" << g_Ids[currentInstance] << ": " << g_Results[currentInstance] << endl;
+		cout << "#" << g_Ids[currentInstance] << ": " << g_Results[currentInstance] << ", t: " << (clock() - L) / (double) CLOCKS_PER_SEC << endl;
 	}
+
+	// get final time
+    double resTime = (clock() - S) / (double) CLOCKS_PER_SEC;
+    cout << "Total time: " << resTime << endl;
 
 	deinit();
 	cout << endl << "== Run finished ==" << endl;

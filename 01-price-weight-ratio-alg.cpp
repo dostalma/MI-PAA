@@ -4,7 +4,8 @@
 #include <fstream>
 #include <string.h>
 #include <sstream>
-#include <math.h> 
+#include <cmath>
+#include <bits/stdc++.h>
 
 using namespace std;
 
@@ -14,20 +15,35 @@ const int ROWS_COUNT = 50;
 int g_N = 0;
 // total maximum weight
 int g_M = 0;
-// array of weights
-int ** g_Weights; 
-// array of prices
-int ** g_Prices; 
-// array of unique ids
-double ** g_Ratios;
 // array of unique ids
 int * g_Ids;
 // array of best results
 int * g_Results;
 
-int compare (const void * a, const void * b)
-{
-  return ( *(double*)b - *(double*)a );
+struct TItem {
+	int m_Price;
+	int m_Weight;
+	double m_Ratio;
+};
+
+TItem ** g_Items;
+
+void printItems (int limit) {
+	for (int i = 0, range = limit != 0 ? limit : ROWS_COUNT; i < range; i++) {
+		cout << g_Ids[i] << ": ";
+		for (int j = 0; j < g_N; j++) {
+			cout << g_Items[i][j].m_Ratio << " ";
+		}
+		cout << endl;
+	}
+}
+
+void printItem (int pos) {
+	cout << g_Ids[pos] << ": " << endl;
+	for (int j = 0; j < g_N; j++) {
+		printf ("r: %f, w: %d, p: %d\n", g_Items[pos][j].m_Ratio, g_Items[pos][j].m_Weight, g_Items[pos][j].m_Price);
+	}
+	cout << endl;
 }
 
 /**
@@ -36,9 +52,7 @@ int compare (const void * a, const void * b)
 bool initialize(char* fileArgument) {
 	g_Ids = new int[ROWS_COUNT];
 	g_Results = new int[ROWS_COUNT];
-	g_Weights = new int*[ROWS_COUNT];
-	g_Prices = new int*[ROWS_COUNT];
-	g_Ratios = new double*[ROWS_COUNT];
+	g_Items = new TItem*[ROWS_COUNT];
 
 	string filepath = "inst/"; 
 	filepath += fileArgument;
@@ -58,17 +72,13 @@ bool initialize(char* fileArgument) {
 		iss >> g_N;
 		iss >> g_M;
 
-		g_Weights[i] = new int[g_N];
-		g_Prices[i] = new int[g_N];
-		g_Ratios[i] = new double[g_N];
+		g_Items[i] = new TItem[g_N];
+
 		for (int j = 0; j < g_N; ++j) {
-			iss >> g_Weights[i][j];
-			iss >> g_Prices[i][j];
-			g_Ratios[i][j] = (double) g_Prices[i][j] / (double) g_Weights[i][j];			
+			iss >> g_Items[i][j].m_Weight;
+			iss >> g_Items[i][j].m_Price;
+			g_Items[i][j].m_Ratio = ((double)g_Items[i][j].m_Price) / (double) g_Items[i][j].m_Weight;
 		}
-		qsort (g_Ratios[i], 6, sizeof(double), compare);
-	    for (int j=0; j<g_N; j++)
-	       if (i==0) printf ("%f ",g_Ratios[i][j]);
 
 	    i++;
 	}
@@ -80,29 +90,26 @@ bool initialize(char* fileArgument) {
  * Free used memory
  */
 void deinit() {
-	if (g_Ids != NULL) delete g_Ids;
-	if (g_Results != NULL) delete g_Results;
+	if (g_Ids != NULL) delete [] g_Ids;
+	if (g_Results != NULL) delete [] g_Results;
 
-	if (g_Weights != NULL) {
+	if (g_Items != NULL) {
 		for (int i = 0; i < ROWS_COUNT; i++) 
-			if (g_Weights[i] != NULL) 
-				delete g_Weights[i];
-		delete g_Weights;
+			if (g_Items[i] != NULL) 
+				delete [] g_Items[i];
+		delete [] g_Items;
 	}
+}
 
-	if (g_Prices != NULL) {
-		for (int i = 0; i < ROWS_COUNT; i++) 
-			if (g_Prices[i] != NULL) 
-				delete g_Prices[i];
-		delete g_Prices;
-	}
+int compare (const void * a, const void * b)
+{
+	TItem item1 = *(TItem*) a;
+	TItem item2 = *(TItem*) b;
 
-	if (g_Ratios != NULL) {
-		for (int i = 0; i < ROWS_COUNT; i++) 
-			if (g_Ratios[i] != NULL) 
-				delete g_Ratios[i];
-		delete g_Ratios;
-	}
+	double scale = 0.00001, fixscale = 10000;
+	double val1 = (int)((double)item2.m_Ratio / scale) * scale;
+	double val2 = (int)((double)item1.m_Ratio / scale) * scale;
+  	return val1*fixscale - val2*fixscale;
 }
 
 /**
@@ -113,19 +120,14 @@ void deinit() {
  */
 int calculate(int pos) {
 	int bestPrice = 0;
-	int maxOptions = pow(2, g_N);
+	int remainingWeight = g_M;
 
-	for (int option = 0; option < maxOptions; option++) {
-		int currentWeight = 0;
-		int currentPrice = 0;
-		for (int item = 0; item < g_N; item++) {
-			if (option & (int)pow(2,item) && (g_Weights[pos][item] <=  g_M - currentWeight)) {
-				currentWeight += g_Weights[pos][item];
-				currentPrice += g_Prices[pos][item];
-			}
+	//printItem(pos); 
+	for (int i = 0; i < g_N; i++) {
+		if (g_Items[pos][i].m_Weight <= remainingWeight) {
+			bestPrice += g_Items[pos][i].m_Price;
+			remainingWeight -= g_Items[pos][i].m_Weight;
 		}
-		if (currentPrice > bestPrice)
-			bestPrice = currentPrice;
 	}
 
 	return bestPrice;
@@ -134,7 +136,7 @@ int calculate(int pos) {
  * Main function of the program
  */
 int main(int argc,  char **argv) {
-	cout << "dostam13 Mi-PAA task 01 - price/weight ratio alg." << endl;
+	cout << "dostam13 MI-PAA task 01 - price/weight ratio alg." << endl;
 
 	if (argc < 2) {
 		cout << "Error: Instance package name is required (eg. type knap_4 to load from knap_4.inst.dat file)" << endl;
@@ -143,10 +145,24 @@ int main(int argc,  char **argv) {
 	if (!initialize(argv[1]))
 		return 1;
 
-	for (int currentInstance = 0; currentInstance < 1; ++currentInstance) {
+	// start counting time
+    clock_t S, L;
+    S = clock();
+
+	for (int currentInstance = 0; currentInstance < ROWS_COUNT; ++currentInstance) {
+		L = clock();
+		//printItems(4);
+		//for (int j=0; j<g_N; j++)
+	    //   printf ("%f ",g_Items[currentInstance][j].m_Ratio);
+	   //cout << endl;
+		qsort (g_Items[currentInstance], g_N, sizeof(TItem), compare);
 		g_Results[currentInstance] = calculate(currentInstance);
-		cout << "#" << g_Ids[currentInstance] << ": " << g_Results[currentInstance] << endl;
+		cout << "#" << g_Ids[currentInstance] << ": " << g_Results[currentInstance] << ", t: " << (clock() - L) / (double) CLOCKS_PER_SEC << endl;
 	}
+
+	// get final time
+    double resTime = (clock() - S) / (double) CLOCKS_PER_SEC;
+    cout << "Total time: " << resTime << endl;
 
 	deinit();
 	cout << endl << "== Run finished ==" << endl;

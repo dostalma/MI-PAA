@@ -1,0 +1,4 @@
+./ratio.out knap_22 | grep "#" | cut -d " " -f 2 | tr -d "," > output.txt
+cat sol/knap_20.sol.dat | cut -d " " -f 3 > expected.txt
+diff -y output.txt expected.txt | grep "|" 
+diff -y output.txt expected.txt | grep "|" -c
