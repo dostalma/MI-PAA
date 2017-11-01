@@ -2,3 +2,10 @@
 cat sol/knap_20.sol.dat | cut -d " " -f 3 > expected.txt
 diff -y output.txt expected.txt | grep "|" 
 diff -y output.txt expected.txt | grep "|" -c
+diff -y output.txt expected.txt | grep "|" | tr -d "|" | tr -d "\t" | cut -d " " -f 7 > diff2.txt
+
+## libre office:
+C1: =B1 - A1
+D1: =C1 / B1 * 100
+ctrl + shift + end -select all used field in the columns
+ctrl + d - execute formula on them
