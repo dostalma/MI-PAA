@@ -35,7 +35,7 @@ bool initialize(char* fileArgument) {
 	g_Weights = new int*[ROWS_COUNT];
 	g_Prices = new int*[ROWS_COUNT];
 
-	string filepath = "inst/"; 
+	string filepath = "gen_inst/"; 
 	filepath += fileArgument;
 	filepath += ".inst.dat";
 
@@ -144,6 +144,7 @@ int main(int argc,  char **argv) {
     S = clock();
 
 	for (int currentInstance = 0; currentInstance < ROWS_COUNT; ++currentInstance) {
+		if (g_Ids[currentInstance] == 9567) continue;
 		L = clock();
 		g_Results[currentInstance] = calculate(currentInstance);
 		cout << "#" << g_Ids[currentInstance] << ": " << g_Results[currentInstance] << ", t: " << (clock() - L) / (double) CLOCKS_PER_SEC << endl;

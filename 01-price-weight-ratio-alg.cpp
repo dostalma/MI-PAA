@@ -19,6 +19,12 @@ int g_M = 0;
 int * g_Ids;
 // array of best results
 int * g_Results;
+// correct results found in sol directory
+int * g_CorrectResults;
+// array of deviations in instances
+double * g_Deviations;
+// maximum deviation found in instances
+double g_maxDeviation = 0.0;
 
 struct TItem {
 	int m_Price;
@@ -53,8 +59,10 @@ bool initialize(char* fileArgument) {
 	g_Ids = new int[ROWS_COUNT];
 	g_Results = new int[ROWS_COUNT];
 	g_Items = new TItem*[ROWS_COUNT];
-
-	string filepath = "inst/"; 
+	g_Deviations = new double[ROWS_COUNT];
+	g_CorrectResults = new int[ROWS_COUNT];
+	
+	string filepath = "gen_inst/"; 
 	filepath += fileArgument;
 	filepath += ".inst.dat";
 
@@ -83,6 +91,20 @@ bool initialize(char* fileArgument) {
 	    i++;
 	}
 
+	filepath = "corr_res.txt";
+
+	ifstream file2 (filepath.c_str());
+	if (!file2.is_open()) {
+		cout << "File 2 " << filepath << " could not be loaded!" << endl;
+		return false;
+	}
+
+	i = 0;
+	while (getline (file2, line)) {
+		istringstream iss(line);
+		iss >> g_CorrectResults[i++];
+	}
+
 	return true;
 }
 
@@ -92,6 +114,8 @@ bool initialize(char* fileArgument) {
 void deinit() {
 	if (g_Ids != NULL) delete [] g_Ids;
 	if (g_Results != NULL) delete [] g_Results;
+	if (g_CorrectResults != NULL) delete g_CorrectResults;
+	if (g_Deviations != NULL) delete g_Deviations;
 
 	if (g_Items != NULL) {
 		for (int i = 0; i < ROWS_COUNT; i++) 
@@ -136,7 +160,7 @@ int calculate(int pos) {
  * Main function of the program
  */
 int main(int argc,  char **argv) {
-	cout << "dostam13 MI-PAA task 01 - price/weight ratio alg." << endl;
+	cout << "dostam13 MI-PAA task 01 - price/weight ratio alg. v2" << endl;
 
 	if (argc < 2) {
 		cout << "Error: Instance package name is required (eg. type knap_4 to load from knap_4.inst.dat file)" << endl;
@@ -149,6 +173,7 @@ int main(int argc,  char **argv) {
     clock_t S, L;
     S = clock();
 
+	double totalAverageDeviation = 0.0;
 	for (int currentInstance = 0; currentInstance < ROWS_COUNT; ++currentInstance) {
 		L = clock();
 		//printItems(4);
@@ -157,8 +182,18 @@ int main(int argc,  char **argv) {
 	   //cout << endl;
 		qsort (g_Items[currentInstance], g_N, sizeof(TItem), compare);
 		g_Results[currentInstance] = calculate(currentInstance);
-		cout << "#" << g_Ids[currentInstance] << ": " << g_Results[currentInstance] << ", t: " << (clock() - L) / (double) CLOCKS_PER_SEC << endl;
+		g_Deviations[currentInstance] = ((abs (g_Results[currentInstance] - g_CorrectResults[currentInstance])) 
+										/ (double)g_CorrectResults[currentInstance]) * 100;
+		if (g_maxDeviation < g_Deviations[currentInstance])
+			g_maxDeviation = g_Deviations[currentInstance];
+
+		totalAverageDeviation += g_Deviations[currentInstance];
+		printf("#%d: %d, deviation: %f\n", g_Ids[currentInstance], g_Results[currentInstance], g_Deviations[currentInstance]);
 	}
+
+	totalAverageDeviation /= (double) ROWS_COUNT;
+	printf("Total average deviation: %f\n", totalAverageDeviation);
+	printf("Max deviation: %f\n", g_maxDeviation);
 
 	// get final time
     double resTime = (clock() - S) / (double) CLOCKS_PER_SEC;

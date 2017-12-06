@@ -33,7 +33,7 @@ bool initialize(char* fileArgument) {
 	g_Weights = new int*[ROWS_COUNT];
 	g_Prices = new int*[ROWS_COUNT];
 
-	string filepath = "inst/"; 
+	string filepath = "gen_inst/"; 
 	filepath += fileArgument;
 	filepath += ".inst.dat";
 

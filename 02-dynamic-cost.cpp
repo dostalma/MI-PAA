@@ -6,10 +6,12 @@
 #include <sstream>
 #include <cmath>
 #include <bits/stdc++.h>
+#include <algorithm> 
 
 using namespace std;
 
 const int ROWS_COUNT = 50;
+const int INFINITE = 999999;
 
 // items#
 int g_N = 0;
@@ -23,8 +25,8 @@ int ** g_Prices;
 int * g_Ids;
 // array of best results
 int * g_Results;
-// best calculated result of each instance
-int * g_BestPriceWeightPair;
+// support matrix of weight (core of dynamic programming alg.)
+int ** g_WMatrix;
 
 /**
  * Initialize method
@@ -34,9 +36,8 @@ bool initialize(char* fileArgument) {
 	g_Results = new int[ROWS_COUNT];
 	g_Weights = new int*[ROWS_COUNT];
 	g_Prices = new int*[ROWS_COUNT];
-	g_BestPriceWeightPair = new int[2];
 
-	string filepath = "inst/"; 
+	string filepath = "gen_inst/"; 
 	filepath += fileArgument;
 	filepath += ".inst.dat";
 
@@ -72,7 +73,6 @@ bool initialize(char* fileArgument) {
 void deinit() {
 	if (g_Ids != NULL) delete g_Ids;
 	if (g_Results != NULL) delete g_Results;
-	if (g_BestPriceWeightPair != NULL) delete g_BestPriceWeightPair;
 
 	if (g_Weights != NULL) {
 		for (int i = 0; i < ROWS_COUNT; i++) 
@@ -89,34 +89,6 @@ void deinit() {
 	}
 }
 
-void calculateRec(int instance, int pos, bool include, int previousWeight, int previousPrice) {
-	int currentWeight = previousWeight,
-	    currentPrice = previousPrice;
-
-	if (include) {
-		currentWeight += g_Weights[instance][pos];
-		currentPrice += g_Prices[instance][pos];
-	}
-
-	if (currentWeight > g_M) {
-		return;
-	}
-
-	if (currentPrice > g_BestPriceWeightPair[0]) {
-		g_BestPriceWeightPair[0] = currentPrice;
-		g_BestPriceWeightPair[1] = currentWeight;
-	}
-
-	if (pos == g_N - 1) {
-		return;
-	}
-
-	for (int i = 0; i <= pos; i++) {
-		calculateRec(instance, pos + 1, true, currentWeight, currentPrice);
-		calculateRec(instance, pos + 1, false, currentWeight, currentPrice);
-	}
-}
-
 /**
  * Calculate problem of an instance
  * Dynamic programming - Price method alg.
@@ -124,19 +96,43 @@ void calculateRec(int instance, int pos, bool include, int previousWeight, int p
  * @return Best calculated result of this instance
  */
 int calculate(int pos) {
-	g_BestPriceWeightPair[0] = 0; // reset price
-	g_BestPriceWeightPair[1] = 0; // reset weight
+	// calculate sum of all prices
+	int maxPriceSum = 0;
+	for (int i = 0; i < g_N; i++) maxPriceSum += g_Prices[pos][i];
 
-    calculateRec(pos, 0, true, 0, 0);
-    calculateRec(pos, 0, false, 0, 0);
+	// initialize support weight matrix 
+	g_WMatrix = new int*[g_N+1];
+	for (int i = 0; i <= g_N; i++) g_WMatrix[i] = new int[maxPriceSum+1];
+	// set W[0][0] to 0
+	g_WMatrix[0][0] = 0;
+	// set W[0][p] to INF for p > 0
+	for (int i = 1; i <= maxPriceSum; i++) g_WMatrix[0][i] = INFINITE;
 
-	return g_BestPriceWeightPair[0];
+	// calculate all other fields in support weight matrix
+    for (int i = 0; i < g_N; i++) {
+    	for (int p = 0; p <= maxPriceSum; p++) {
+    		g_WMatrix[i+1][p] = min(g_WMatrix[i][p], (p - g_Prices[pos][i]) < 0 ? 
+    								INFINITE : ( g_WMatrix[i][p - g_Prices[pos][i]] + g_Weights[pos][i] ));
+    	}
+    }
+
+    // get highest achieved price within knapsack capacity (in last column)
+    int bestPrice = 0;
+    for (int p = 0; p <= maxPriceSum; p++) {
+    	if (g_WMatrix[g_N][p] <= g_M && p > bestPrice) bestPrice = p;
+    }
+
+    // deinitialize support weight matrix
+	for (int i = 0; i <= g_N; i++) delete g_WMatrix[i];
+	delete g_WMatrix;
+
+	return bestPrice;
 }
 /**
  * Main function of the program
  */
 int main(int argc,  char **argv) {
-	cout << "dostam13 MI-PAA task 02 - branch and bound alg." << endl;
+	cout << "dostam13 MI-PAA task 02 - dynamic programming price decomposition alg." << endl;
 
 	if (argc < 2) {
 		cout << "Error: Instance package name is required (eg. type knap_4 to load from knap_4.inst.dat file)" << endl;
@@ -149,11 +145,18 @@ int main(int argc,  char **argv) {
     clock_t S, L;
     S = clock();
 
+	double totalAverageDeviation = 0.0;
 	for (int currentInstance = 0; currentInstance < ROWS_COUNT; ++currentInstance) {
 		L = clock();
 		g_Results[currentInstance] = calculate(currentInstance);
+		g_Deviations[currentInstance] = ((abs (g_Results[currentInstance] - g_CorrectResults[currentInstance])) 
+										/ (double)g_CorrectResults[currentInstance]) * 100;
+		totalAverageDeviation += g_Deviations[currentInstance];
 		cout << "#" << g_Ids[currentInstance] << ": " << g_Results[currentInstance] << ", t: " << (clock() - L) / (double) CLOCKS_PER_SEC << endl;
 	}
+
+	totalAverageDeviation /= (double) ROWS_COUNT;
+	printf("Total average deviation: %f\n", totalAverageDeviation);
 
 	// get final time
     double resTime = (clock() - S) / (double) CLOCKS_PER_SEC;

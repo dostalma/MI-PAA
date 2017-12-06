@@ -10,6 +10,7 @@
 using namespace std;
 
 const int ROWS_COUNT = 50;
+const int INFINITE = 999999;
 
 // items#
 int g_N = 0;
@@ -29,6 +30,13 @@ int * g_BestPriceWeightPair;
 double g_E = 0;
 // array of adjusted prices
 int * g_AdjustedPrices;
+// correct results found in sol directory
+int * g_CorrectResults;
+// array of deviations in instances
+double * g_Deviations;
+// support matrix of weight (core of dynamic programming alg.)
+int ** g_WMatrix;
+
 
 /**
  * Initialize method
@@ -38,7 +46,8 @@ bool initialize(char* fileArgument, char* relativeErrorArgument) {
 	g_Results = new int[ROWS_COUNT];
 	g_Weights = new int*[ROWS_COUNT];
 	g_Prices = new int*[ROWS_COUNT];
-	g_BestPriceWeightPair = new int[2];
+	g_CorrectResults = new int[ROWS_COUNT];
+	g_Deviations = new double[ROWS_COUNT];
 
 	string filepath = "inst/"; 
 	filepath += fileArgument;
@@ -67,6 +76,25 @@ bool initialize(char* fileArgument, char* relativeErrorArgument) {
 		i++;
 	}
 
+	filepath = "sol/";
+	filepath += fileArgument;
+	filepath += ".sol.dat";
+
+	ifstream file2 (filepath.c_str());
+	if (!file2.is_open()) {
+		cout << "File 2 " << filepath << " could not be loaded!" << endl;
+		return false;
+	}
+
+	i = 0;
+	while (getline (file2, line)) {
+		istringstream iss(line);
+		string _null;
+		iss >> _null;
+		iss >> _null;
+		iss >> g_CorrectResults[i++];
+	}
+
 	g_E = atof(relativeErrorArgument);
 	printf("Epsilon set to %f\n", g_E);
 
@@ -79,7 +107,8 @@ bool initialize(char* fileArgument, char* relativeErrorArgument) {
 void deinit() {
 	if (g_Ids != NULL) delete g_Ids;
 	if (g_Results != NULL) delete g_Results;
-	if (g_BestPriceWeightPair != NULL) delete g_BestPriceWeightPair;
+	if (g_CorrectResults != NULL) delete g_CorrectResults;
+	if (g_Deviations != NULL) delete g_Deviations;
 
 	if (g_Weights != NULL) {
 		for (int i = 0; i < ROWS_COUNT; i++) 
@@ -103,34 +132,6 @@ void createAdjustedPrices(int pos, double _K) {
 	}
 }
 
-void calculateRec(int instance, int pos, bool include, int previousWeight, int previousPrice) {
-	int currentWeight = previousWeight,
-	    currentPrice = previousPrice;
-
-	if (include) {
-		currentWeight += g_Weights[instance][pos];
-		currentPrice += g_AdjustedPrices[pos];
-	}
-
-	if (currentWeight > g_M) {
-		return;
-	}
-
-	if (currentPrice > g_BestPriceWeightPair[0]) {
-		g_BestPriceWeightPair[0] = currentPrice;
-		g_BestPriceWeightPair[1] = currentWeight;
-	}
-
-	if (pos == g_N - 1) {
-		return;
-	}
-
-	for (int i = 0; i <= pos; i++) {
-		calculateRec(instance, pos + 1, true, currentWeight, currentPrice);
-		calculateRec(instance, pos + 1, false, currentWeight, currentPrice);
-	}
-}
-
 /**
  * Calculate problem of an instance
  * Dynamic programming - Price method alg.
@@ -138,8 +139,17 @@ void calculateRec(int instance, int pos, bool include, int previousWeight, int p
  * @return Best calculated result of this instance
  */
 int calculate(int pos) {
-	g_BestPriceWeightPair[0] = 0; // reset price
-	g_BestPriceWeightPair[1] = 0; // reset weight
+	// calculate sum of all prices
+	int maxPriceSum = 0;
+	for (int i = 0; i < g_N; i++) maxPriceSum += g_Prices[pos][i];
+
+	// initialize support weight matrix 
+	g_WMatrix = new int*[g_N+1];
+	for (int i = 0; i <= g_N; i++) g_WMatrix[i] = new int[maxPriceSum+1];
+	// set W[0][0] to 0
+	g_WMatrix[0][0] = 0;
+	// set W[0][p] to INF for p > 0
+	for (int i = 1; i <= maxPriceSum; i++) g_WMatrix[0][i] = INFINITE;
 
 	// find maximum among prices
 	int cMax = 0;
@@ -148,11 +158,26 @@ int calculate(int pos) {
 	double _K = (g_E * (double) cMax) / (double) g_N;
 	createAdjustedPrices(pos, _K);
 
-    calculateRec(pos, 0, true, 0, 0);
-    calculateRec(pos, 0, false, 0, 0);
+	// calculate all other fields in support weight matrix
+    for (int i = 0; i < g_N; i++) {
+    	for (int p = 0; p <= maxPriceSum; p++) {
+    		g_WMatrix[i+1][p] = min(g_WMatrix[i][p], (p - g_AdjustedPrices[i]) < 0 ? 
+    								INFINITE : ( g_WMatrix[i][p - g_AdjustedPrices[i]] + g_Weights[pos][i] ));
+    	}
+    }
 
-    delete g_AdjustedPrices;
-	return g_BestPriceWeightPair[0];
+    // get highest achieved price within knapsack capacity (in last column)
+    int bestPrice = 0;
+    for (int p = 0; p <= maxPriceSum; p++) {
+    	if (g_WMatrix[g_N][p] <= g_M && p > bestPrice) bestPrice = p;
+    }
+
+    // deinitialize support weight matrix
+	for (int i = 0; i <= g_N; i++) delete g_WMatrix[i];
+	delete g_WMatrix;
+	delete g_AdjustedPrices;
+
+	return bestPrice;
 }
 /**
  * Main function of the program
@@ -171,11 +196,18 @@ int main(int argc,  char **argv) {
     clock_t S, L;
     S = clock();
 
+ 	double totalAverageDeviation = 0.0;
 	for (int currentInstance = 0; currentInstance < ROWS_COUNT; ++currentInstance) {
 		L = clock();
 		g_Results[currentInstance] = calculate(currentInstance);
-		cout << "#" << g_Ids[currentInstance] << ": " << g_Results[currentInstance] << ", t: " << (clock() - L) / (double) CLOCKS_PER_SEC << endl;
+		g_Deviations[currentInstance] = ((abs (g_Results[currentInstance] - g_CorrectResults[currentInstance])) 
+										/ (double)g_CorrectResults[currentInstance]) * 100;
+		totalAverageDeviation += g_Deviations[currentInstance];
+		double timeSpent = (clock() - L) / (double) CLOCKS_PER_SEC;
+		printf("#%d: %d, t: %f, deviation: %f\n", g_Ids[currentInstance], g_Results[currentInstance], timeSpent, g_Deviations[currentInstance]);
 	}
+	totalAverageDeviation /= (double) ROWS_COUNT;
+	printf("Total average deviation: %f\n", totalAverageDeviation);
 
 	// get final time
     double resTime = (clock() - S) / (double) CLOCKS_PER_SEC;

@@ -9,3 +9,9 @@ C1: =B1 - A1
 D1: =C1 / B1 * 100
 ctrl + shift + end -select all used field in the columns
 ctrl + d - execute formula on them
+
+./dynamic.out gen_weight_50_45 | grep '#' | cut -d " " -f 2 | tr -d "," > corr_res.txt 
+
+./gen -n 30 -N 50 -m 0.7 -k 1 -C 500 -d 0 -W 500 > gen_inst/gen_price.inst.dat
+
+./dynamic.out gen_price | grep '#' | cut -d " " -f 2 | tr -d "," > corr_res.txt ; ./ratio.out gen_price
